@@ -6,7 +6,7 @@ import copy
 import datetime as dt
 import numpy as np
 
-def simulate(startdate, enddate, symbols, allocations):
+def simulate(startdate, enddate, symbols, allocations, use_cache=0):
     """
     A Python function that can simulate and assess the performance of a 4 stock portfolio.
     Inputs to the function include:
@@ -21,7 +21,7 @@ def simulate(startdate, enddate, symbols, allocations):
     trading_timestamps = du.getNYSEdays(startdate, enddate, trading_duration)
 
     # Get data from Yahoo
-    data_provider = da.DataAccess('Yahoo', cachestalltime=0)
+    data_provider = da.DataAccess('Yahoo', cachestalltime=use_cache) 
     data_keys = ['open', 'high', 'low', 'close', 'volume', 'actual_close']
     data_list = data_provider.get_data(trading_timestamps, symbols, data_keys)
     data = dict(zip(data_keys, data_list))
@@ -51,13 +51,12 @@ def next_seq(sz, limit=10):
     returns all possible sequences [a1, a2, ..., a{sz}] so that their sum is equal to limit
     """
     if sz == 1:
-        return [[limit / 10.]]
-    accum = list()
-    for i in range(limit + 1):
-        for n in next_seq(sz -1, i):
-            accum = accum + [n + [(limit - i) / 10.]]
-    return accum
-
+        yield [limit / 10.]
+    else:
+        for i in range(limit + 1):
+            for n in next_seq(sz - 1, i):
+                yield n + [(limit - i) / 10.]
+    
 
 def optimize(startdate, enddate, symbols):
     """
@@ -69,12 +68,17 @@ def optimize(startdate, enddate, symbols):
     best_alloc = None
 
     for allocation in next_seq(len(symbols)):
-        port = simulate(startdate, enddate, symbols, allocation)
-	print allocation, " -> ", port
+        port = simulate(startdate, enddate, symbols, allocation, use_cache=12)
         if port[2] > best_sharpe:
             best_sharpe = port[2]
             best_port = copy.deepcopy(port)
             best_alloc = copy.deepcopy(allocation)
 
-    print best_port
-    print best_alloc
+    print "Start Date: ", startdate.strftime("%B %d, %Y")
+    print "End Date: ", enddate.strftime("%B %d, %Y")
+    print "Symbols: ", symbols
+    print "Optimal Allocations: ", best_alloc
+    print "Sharpe Ratio: ", best_port[2]
+    print "Volatility (stdev of daily returns):  ", best_port[0]
+    print "Average Daily Return:  ", best_port[1]
+    print "Cumulative Return:  ", best_port[3]
